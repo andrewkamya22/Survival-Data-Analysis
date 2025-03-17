@@ -1,0 +1,87 @@
+---
+title: "Survival Analysis of Breastfeeding Duration"
+author: "Andrew Kamya"
+date:  "November, 2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+Survival analysis is a statistical approach used to analyze time-to-event data. In this project, we examine the duration of breastfeeding using the `bfeed` dataset from the `KMsurv` package. We apply non-parametric, semi-parametric, and parametric survival models to understand factors influencing breastfeeding duration.
+
+
+# Data Preparation
+We begin by loading the necessary packages and dataset.
+
+```{r load-data}
+library(survival)
+library(KMsurv)
+data(bfeed)
+head(bfeed)
+```
+
+The key variables of interest are:
+- `duration`: Breastfeeding duration in weeks.
+- `delta`: Indicator for completed breastfeeding (1=yes, 0=no).
+- `smoke`: Whether the mother smoked at the child's birth (1=yes, 0=no).
+
+# Kaplan-Meier Estimation
+We estimate and plot the survival functions for smoking and non-smoking mothers.
+
+```{r kaplan-meier}
+data1 <- subset(bfeed, smoke == 1)
+data0 <- subset(bfeed, smoke == 0)
+
+fit1 <- survfit(Surv(duration, delta) ~ 1, data = data1)
+fit0 <- survfit(Surv(duration, delta) ~ 1, data = data0)
+
+plot(fit0, col = "blue", conf.int = FALSE, main = "Kaplan-Meier Survival Curves",
+     xlab = "Duration (weeks)", ylab = "Survival Probability")
+lines(fit1, col = "red", conf.int = FALSE)
+legend("topright", legend = c("Non-Smoker", "Smoker"), col = c("blue", "red"), lty = 1)
+```
+
+**Interpretation**: The survival curves suggest that mothers who smoke tend to stop breastfeeding earlier than non-smokers.
+
+# Cox Proportional Hazards Model
+Next, we fit a Cox proportional hazards model to estimate relative risks.
+
+```{r cox-model}
+fit_cox <- coxph(Surv(duration, delta) ~ as.factor(race) + poverty + smoke + 
+                 alcohol + agemth + ybirth + yschool + pc3mth, data = bfeed)
+summary(fit_cox)
+```
+
+**Interpretation**:
+- Smoking increases the hazard of stopping breastfeeding (`HR = 1.28`, p < 0.01).
+- Higher maternal education (`yschool`) is associated with longer breastfeeding duration.
+
+# Parametric Accelerated Failure Time (AFT) Models
+We compare Weibull, log-logistic, and log-normal AFT models.
+
+```{r aft-models}
+fit_weibull <- survreg(Surv(duration, delta) ~ as.factor(race) + poverty + smoke + 
+                       alcohol + agemth + ybirth + yschool + pc3mth, 
+                       data = bfeed, dist = "weibull")
+fit_loglogistic <- survreg(Surv(duration, delta) ~ as.factor(race) + poverty + smoke + 
+                           alcohol + agemth + ybirth + yschool + pc3mth, 
+                           data = bfeed, dist = "loglogistic")
+fit_lognormal <- survreg(Surv(duration, delta) ~ as.factor(race) + poverty + smoke + 
+                          alcohol + agemth + ybirth + yschool + pc3mth, 
+                          data = bfeed, dist = "lognormal")
+
+list(weibull = logLik(fit_weibull), loglogistic = logLik(fit_loglogistic), lognormal = logLik(fit_lognormal))
+```
+
+**Interpretation**:
+- The log-normal model provides the best fit based on log-likelihood values.
+- Results are consistent with the Cox model, confirming smoking negatively impacts breastfeeding duration.
+
+# Conclusion
+Survival analysis of breastfeeding duration shows that maternal smoking significantly shortens breastfeeding duration. Higher education is associated with prolonged breastfeeding. The log-normal AFT model best fits the data, supporting findings from the Cox model.
+
+This analysis highlights the importance of maternal characteristics in influencing breastfeeding behavior and can inform public health policies.
+
